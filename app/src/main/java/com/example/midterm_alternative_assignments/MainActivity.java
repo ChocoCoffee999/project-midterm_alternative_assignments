@@ -3,10 +3,14 @@ package com.example.midterm_alternative_assignments;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.FrameLayout;
 import android.widget.TableLayout;
 import android.widget.TableRow;
 import android.widget.TextView;
@@ -19,6 +23,9 @@ import android.widget.Button;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.time.Instant;
@@ -45,6 +52,8 @@ import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import retrofit2.http.Query;
 
 import java.util.concurrent.TimeUnit;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 
 public class MainActivity extends AppCompatActivity {
@@ -67,6 +76,12 @@ public class MainActivity extends AppCompatActivity {
     private Instant requestTime;
     private String baseUrl = "http://10.0.2.2:8800/";
 
+    private LayoutInflater inflater;
+    private FrameLayout container;
+    private View overlayView;
+
+    private Boolean responseCreate = false;
+
     public interface ApiService {
         @GET("get/data")  // 서버의 엔드포인트 URL을 여기에 추가
         Call<JsonArray> fetchData(
@@ -80,6 +95,10 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        inflater = LayoutInflater.from(this);
+        overlayView = inflater.inflate(R.layout.layout_response, null);
+        container = findViewById(R.id.mainFrameLayout);
 
         tableLayout = findViewById(R.id.tableLayout);
         userInputEditText = findViewById(R.id.userInputEditText);
@@ -109,6 +128,20 @@ public class MainActivity extends AppCompatActivity {
                 imageButton.setId(numRows*8+j);
                 imageButton.setImageResource(R.drawable.green_button); // 이미지 설정
                 imageButton.setLayoutParams(new TableRow.LayoutParams(30, 100));
+                imageButton.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        showOverlayView();
+
+                        ImageButton cancelButton = findViewById(R.id.cancelButton);
+                        cancelButton.setOnClickListener(new View.OnClickListener() {
+                            @Override
+                            public void onClick(View v2) {
+                                removeOverlayView();
+                            }
+                        });
+                    }
+                });
                 tableRow.addView(imageButton);
             }
             tableLayout.addView(tableRow, numRows);
@@ -133,6 +166,20 @@ public class MainActivity extends AppCompatActivity {
                 imageButton.setId(numRows*8+j);
                 imageButton.setImageResource(R.drawable.green_button); // 이미지 설정
                 imageButton.setLayoutParams(new TableRow.LayoutParams(buttonSize, buttonSize));
+                imageButton.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        showOverlayView();
+
+                        ImageButton cancelButton = findViewById(R.id.cancelButton);
+                        cancelButton.setOnClickListener(new View.OnClickListener() {
+                            @Override
+                            public void onClick(View v2) {
+                                removeOverlayView();
+                            }
+                        });
+                    }
+                });
                 tableRow.addView(imageButton);
             }
             if (numRows==0){
@@ -189,6 +236,20 @@ public class MainActivity extends AppCompatActivity {
                     imageButton.setId(numRows*8+j);
                     imageButton.setImageResource(R.drawable.green_button); // 이미지 설정
                     imageButton.setLayoutParams(new TableRow.LayoutParams(buttonSize, buttonSize));
+                    imageButton.setOnClickListener(new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            showOverlayView();
+
+                            ImageButton cancelButton = findViewById(R.id.cancelButton);
+                            cancelButton.setOnClickListener(new View.OnClickListener() {
+                                @Override
+                                public void onClick(View v2) {
+                                    removeOverlayView();
+                                }
+                            });
+                        }
+                    });
                     tableRow.addView(imageButton);
                 }
                 if (numRows==0){
@@ -275,7 +336,7 @@ public class MainActivity extends AppCompatActivity {
         Instant utcNow = Instant.now();
         Duration twoHour = Duration.ofHours(12);
         utcNow = utcNow.minus(twoHour);
-        Log.i("utc",utcNow.toString());
+        //Log.i("utc",utcNow.toString());
         // GET 요청 보내기
         Call<JsonArray> call = apiService.fetchData("application/json", "Token 6a4d033dab3343bdeb4b6e79f08caf1ad26131d4", utcNow.toString()); // "your_time_here"를 Django 시간으로 대체
         call.enqueue(new Callback<JsonArray>() {
@@ -287,19 +348,81 @@ public class MainActivity extends AppCompatActivity {
                         JsonObject jsonObject = jsonArray.get(k).getAsJsonObject();
                         String text = jsonObject.get("text").getAsString();
                         String date = jsonObject.get("created_date").getAsString();
+
+                        DateTimeFormatter formatter = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
+                        LocalDateTime dateTime = LocalDateTime.parse(date, formatter);
+
+                        // 필요한 정보 추출
+                        String year = Integer.toString(dateTime.getYear());
+                        String month = Integer.toString(dateTime.getMonthValue());
+                        if (month.length() == 1) month = "0"+ month;
+                        String day = Integer.toString(dateTime.getDayOfMonth());
+                        if (day.length() == 1) day = "0"+ day;
+                        String hour = Integer.toString(dateTime.getHour());
+                        String minute = Integer.toString(dateTime.getMinute());
+                        String second = Integer.toString(dateTime.getSecond());
+                        String nano = Integer.toString(dateTime.getNano()).substring(0,6);
+
+                        String imageURL = "media/intruder_image/" + year +"/"+ month +"/"+ day +"/"+ hour +"-"+ minute +"-"+ second +"-"+ nano + ".jpg";
+
                         if (numRows > 0 || numCols >0) {
                             for (int i = 1; i <= numRows+1; i += 2) {
                                 if (i < numRows) {
                                     for (int j = 0; j < totalCols; j++) {
                                         TextView textView = findViewById(i*8+j);
+                                        if (textView.getText() == "") continue;
                                         if (text.contains(textView.getText())) {
                                             ImageButton imageButton = findViewById((i-1)*8+j);
                                             imageButton.setImageResource(R.drawable.red_button);
                                             imageButton.setOnClickListener(new View.OnClickListener() {
                                                 @Override
                                                 public void onClick(View v) {
-                                                    ImageButton imageButton = findViewById(v.getId());
-                                                    imageButton.setImageResource(R.drawable.green_button);
+                                                    showOverlayView();
+                                                    TextView createDate = findViewById(R.id.createDate);
+                                                    createDate.setText(date);
+                                                    Button responseCheckButton = findViewById(R.id.responseCheckButton);
+                                                    ImageView noticeImageView = findViewById(R.id.noticeImageView);
+                                                    noticeImageView.setImageResource(R.drawable.red_button);
+                                                    responseCheckButton.setOnClickListener(new View.OnClickListener() {
+                                                        @Override
+                                                        public void onClick(View _v) {
+                                                            imageButton.setImageResource(R.drawable.green_button);
+                                                            noticeImageView.setImageResource(R.drawable.green_button);
+                                                            responseCheckButton.setOnClickListener(new View.OnClickListener() {
+                                                                @Override
+                                                                public void onClick(View _v) {
+                                                                }
+                                                            });
+
+                                                            imageButton.setOnClickListener(new View.OnClickListener() {
+                                                                @Override
+                                                                public void onClick(View _v) {
+                                                                    showOverlayView();
+                                                                    TextView createDate = findViewById(R.id.createDate);
+                                                                    createDate.setText(date);
+                                                                    ImageButton cancelButton = findViewById(R.id.cancelButton);
+                                                                    ImageView responseImage = findViewById(R.id.responseImage);
+                                                                    cancelButton.setOnClickListener(new View.OnClickListener() {
+                                                                        @Override
+                                                                        public void onClick(View _v) {
+                                                                            removeOverlayView();
+                                                                        }
+                                                                    });
+                                                                    loadImage(imageURL, responseImage);
+                                                                }
+                                                            });
+                                                        }
+                                                    });
+
+                                                    ImageButton cancelButton = findViewById(R.id.cancelButton);
+                                                    ImageView responseImage = findViewById(R.id.responseImage);
+                                                    cancelButton.setOnClickListener(new View.OnClickListener() {
+                                                        @Override
+                                                        public void onClick(View _v) {
+                                                            removeOverlayView();
+                                                        }
+                                                    });
+                                                    loadImage(imageURL, responseImage);
                                                 }
                                             });
                                         }
@@ -313,8 +436,52 @@ public class MainActivity extends AppCompatActivity {
                                             imageButton.setOnClickListener(new View.OnClickListener() {
                                                 @Override
                                                 public void onClick(View v) {
-                                                    ImageButton imageButton = findViewById(v.getId());
-                                                    imageButton.setImageResource(R.drawable.green_button);
+                                                    showOverlayView();
+                                                    TextView createDate = findViewById(R.id.createDate);
+                                                    createDate.setText(date);
+                                                    Button responseCheckButton = findViewById(R.id.responseCheckButton);
+                                                    ImageView noticeImageView = findViewById(R.id.noticeImageView);
+                                                    noticeImageView.setImageResource(R.drawable.red_button);
+                                                    responseCheckButton.setOnClickListener(new View.OnClickListener() {
+                                                        @Override
+                                                        public void onClick(View _v) {
+                                                            imageButton.setImageResource(R.drawable.green_button);
+                                                            noticeImageView.setImageResource(R.drawable.green_button);
+                                                            responseCheckButton.setOnClickListener(new View.OnClickListener() {
+                                                                @Override
+                                                                public void onClick(View _v) {
+                                                                }
+                                                            });
+
+                                                            imageButton.setOnClickListener(new View.OnClickListener() {
+                                                                @Override
+                                                                public void onClick(View _v) {
+                                                                    showOverlayView();
+                                                                    TextView createDate = findViewById(R.id.createDate);
+                                                                    createDate.setText(date);
+                                                                    ImageButton cancelButton = findViewById(R.id.cancelButton);
+                                                                    ImageView responseImage = findViewById(R.id.responseImage);
+                                                                    cancelButton.setOnClickListener(new View.OnClickListener() {
+                                                                        @Override
+                                                                        public void onClick(View _v) {
+                                                                            removeOverlayView();
+                                                                        }
+                                                                    });
+                                                                    loadImage(imageURL, responseImage);
+                                                                }
+                                                            });
+                                                        }
+                                                    });
+
+                                                    ImageButton cancelButton = findViewById(R.id.cancelButton);
+                                                    ImageView responseImage = findViewById(R.id.responseImage);
+                                                    cancelButton.setOnClickListener(new View.OnClickListener() {
+                                                        @Override
+                                                        public void onClick(View _v) {
+                                                            removeOverlayView();
+                                                        }
+                                                    });
+                                                    loadImage(imageURL, responseImage);
                                                 }
                                             });
                                         }
@@ -356,5 +523,59 @@ public class MainActivity extends AppCompatActivity {
         if (disposable != null && !disposable.isDisposed()) {
             disposable.dispose();
         }
+    }
+
+    private void showOverlayView() {
+        responseCreate = true;
+        container.addView(overlayView);
+    }
+
+    private void removeOverlayView() {
+        responseCreate = false;
+        container.removeView(overlayView);
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (responseCreate) {
+            removeOverlayView();
+        }
+        else super.onBackPressed();
+    }
+
+    private void loadImage(String imageUrl, ImageView imageView) {
+        Observable.fromCallable(() -> downloadImage(baseUrl+imageUrl, imageView))
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(result -> onImageDownloaded(result, imageView),
+                        throwable -> onImageDownloadError(throwable));
+    }
+
+    private Bitmap downloadImage(String imageUrl, ImageView imageView) {
+        Bitmap bitmap = null;
+        try {
+            // 이미지 URL로부터 Bitmap을 가져옴
+            URL url = new URL(imageUrl);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setDoInput(true);
+            connection.connect();
+            InputStream input = connection.getInputStream();
+            bitmap = BitmapFactory.decodeStream(input);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return bitmap;
+    }
+
+    private void onImageDownloaded(Bitmap result, ImageView imageView) {
+        // 이미지 다운로드 성공 시 처리
+        if (result != null) {
+            imageView.setImageBitmap(result);
+        }
+    }
+
+    private void onImageDownloadError(Throwable throwable) {
+        // 이미지 다운로드 실패 시 처리
+        throwable.printStackTrace();
     }
 }

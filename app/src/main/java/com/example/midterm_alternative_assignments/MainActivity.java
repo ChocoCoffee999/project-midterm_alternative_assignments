@@ -82,6 +82,8 @@ public class MainActivity extends AppCompatActivity {
 
     private Boolean responseCreate = false;
 
+    private Instant utcNow;
+
     public interface ApiService {
         @GET("get/data")  // 서버의 엔드포인트 URL을 여기에 추가
         Call<JsonArray> fetchData(
@@ -333,7 +335,7 @@ public class MainActivity extends AppCompatActivity {
         Log.i("sendGetRequest","retrofit 후");
         // Retrofit 서비스 인터페이스 정의
         ApiService apiService = retrofit.create(ApiService.class);
-        Instant utcNow = Instant.now();
+        utcNow = Instant.now();
         Duration twoHour = Duration.ofHours(12);
         utcNow = utcNow.minus(twoHour);
         //Log.i("utc",utcNow.toString());
@@ -348,7 +350,7 @@ public class MainActivity extends AppCompatActivity {
                         JsonObject jsonObject = jsonArray.get(k).getAsJsonObject();
                         String text = jsonObject.get("text").getAsString();
                         String date = jsonObject.get("created_date").getAsString();
-
+                        utcNow = Instant.now();
                         DateTimeFormatter formatter = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
                         LocalDateTime dateTime = LocalDateTime.parse(date, formatter);
 
